@@ -1,11 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: hello-kubernetes
+  name: webapp
 spec:
   type: LoadBalancer
   selector:
-    app: my-container
+    app: webapp
+    color: blue   # <-- switch later naar green
   ports:
   - name: http
     port: 80
