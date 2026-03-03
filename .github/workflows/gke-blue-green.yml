@@ -11,10 +11,8 @@ env:
   GAR_LOCATION: ${{ secrets.GKE_AR_ZONE }}          # e.g. europe-west4
   GAR_REPO: ${{ secrets.GKE_AR_REPO_NAME }}         # e.g. pcc-webapp
   GKE_CLUSTER: ${{ secrets.GKE_CLUSTER_NAME }}
-  GKE_LOCATION: ${{ secrets.GKE_CLUSTER_ZONE }}     # zone OR region; keep consistent with your cluster type
-
-  # Image name inside the repo (choose 1 and keep it consistent)
-  IMAGE_NAME: pcc-cluster-webapp
+  GKE_LOCATION: ${{ secrets.GKE_CLUSTER_ZONE }}     # zone OR region (must match your cluster type)
+  IMAGE_NAME: webapp                                # IMPORTANT: your cluster currently uses 'webapp:blue/green'
 
 jobs:
   build-push-deploy:
@@ -36,8 +34,7 @@ jobs:
         run: |
           gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev --quiet
 
-      - name: Set IMAGE_TAG + DEPLOYMENT based on branch
-        id: vars
+      - name: Set IMAGE_TAG + K8S_OVERLAY based on branch
         run: |
           if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
             echo "IMAGE_TAG=blue" >> $GITHUB_ENV
@@ -50,14 +47,26 @@ jobs:
             exit 1
           fi
 
-          echo "IMAGE=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$GAR_REPO/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_ENV
+      - name: Debug vars
+        run: |
+          echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
+          echo "PROJECT_ID=$PROJECT_ID"
+          echo "GAR_LOCATION=$GAR_LOCATION"
+          echo "GAR_REPO=$GAR_REPO"
+          echo "IMAGE_NAME=$IMAGE_NAME"
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "K8S_OVERLAY=$K8S_OVERLAY"
 
       - name: Build image
         run: |
+          IMAGE="$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$GAR_REPO/$IMAGE_NAME:$IMAGE_TAG"
+          echo "Building $IMAGE"
           docker build -t "$IMAGE" -f Dockerfile .
 
       - name: Push image
         run: |
+          IMAGE="$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$GAR_REPO/$IMAGE_NAME:$IMAGE_TAG"
+          echo "Pushing $IMAGE"
           docker push "$IMAGE"
 
       - name: Get GKE credentials
@@ -67,18 +76,13 @@ jobs:
           location: ${{ env.GKE_LOCATION }}
           project_id: ${{ env.PROJECT_ID }}
 
-      # Deploy: apply namespace/service once + apply correct deployment (blue or green)
-      - name: Deploy to GKE (blue/green)
+      - name: Deploy to GKE (apply service + both deployments)
         run: |
-          # Example assumes manifests live in k8s/
-          kubectl apply -f k8s/namespace.yaml || true
+          # Service decides which color receives traffic (selector app=webapp,color=blue/green)
           kubectl apply -f k8s/service.yaml
 
-          if [[ "$K8S_OVERLAY" == "blue" ]]; then
-            kubectl apply -f k8s/deployment-blue.yaml
-          else
-            kubectl apply -f k8s/deployment-green.yaml
-          fi
+          # Keep both versions deployed (blue + green)
+          kubectl apply -f k8s/deployment-blue.yaml
+          kubectl apply -f k8s/deployment-green.yaml
 
-          kubectl rollout status deployment/${IMAGE_NAME}-${K8S_OVERLAY} --timeout=120s || true
           kubectl get deploy,svc,pods -o wide
