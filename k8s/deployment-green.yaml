@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: webapp
-        image: nginx:latest
+        image: europe-west4-docker.pkg.dev/cloud-engineering-pcc/pcc-webapp/webapp:green
         ports:
         - containerPort: 80

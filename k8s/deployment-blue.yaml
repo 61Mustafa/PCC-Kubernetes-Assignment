@@ -17,6 +17,6 @@ spec:
       containers:
       - name: webapp
         # Deze image wordt straks door de pipeline gezet met 'kubectl set image'
-        image: nginx:latest
+        image: europe-west4-docker.pkg.dev/cloud-engineering-pcc/pcc-webapp/webapp:blue
         ports:
         - containerPort: 80
