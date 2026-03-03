@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: webapp
+        color: blue
+    spec:
+      containers:
+      - name: webapp
+        # Deze image wordt straks door de pipeline gezet met 'kubectl set image'
+        image: nginx:latest
+        ports:
+        - containerPort: 80

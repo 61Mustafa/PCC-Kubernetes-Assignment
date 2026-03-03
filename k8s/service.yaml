@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+spec:
+  type: LoadBalancer
+  selector:
+    app: webapp
+    color: blue   # <-- switch later naar green
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
