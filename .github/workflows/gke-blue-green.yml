@@ -67,18 +67,22 @@ jobs:
           location: ${{ env.GKE_LOCATION }}
           project_id: ${{ env.PROJECT_ID }}
 
-      # Deploy: apply namespace/service once + apply correct deployment (blue or green)
       - name: Deploy to GKE (blue/green)
-        run: |
-          # Example assumes manifests live in k8s/
-          kubectl apply -f k8s/namespace.yaml || true
-          kubectl apply -f k8s/service.yaml
+           run: |
+             if [[ "$K8S_OVERLAY" == "blue" ]]; then
+               kubectl apply -f k8s/deployment-blue.yaml
+             else
+               kubectl apply -f k8s/deployment-green.yaml
+             fi
 
-          if [[ "$K8S_OVERLAY" == "blue" ]]; then
-            kubectl apply -f k8s/deployment-blue.yaml
-          else
-            kubectl apply -f k8s/deployment-green.yaml
-          fi
+             # Inject the freshly built image into the running deployment
+             kubectl set image deployment/webapp-${K8S_OVERLAY} webapp=$IMAGE
 
-          kubectl rollout status deployment/${IMAGE_NAME}-${K8S_OVERLAY} --timeout=120s || true
-          kubectl get deploy,svc,pods -o wide
+             # Switch the LoadBalancer selector to the active color
+             kubectl patch service webapp \
+               -p "{\"spec\":{\"selector\":{\"app\":\"webapp\",\"color\":\"${K8S_OVERLAY}\"}}}"
+
+             kubectl apply -f k8s/service.yaml
+
+             kubectl rollout status deployment/webapp-${K8S_OVERLAY} --timeout=120s || true
+             kubectl get deploy,svc,pods -o wide
