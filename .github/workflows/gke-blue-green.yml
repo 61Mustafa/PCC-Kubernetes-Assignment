@@ -77,7 +77,7 @@ jobs:
           project_id: ${{ env.PROJECT_ID }}
 
       - name: Deploy to GKE (blue/green)
-           run: |
+        run: |
              if [[ "$K8S_OVERLAY" == "blue" ]]; then
                kubectl apply -f k8s/deployment-blue.yaml
              else
