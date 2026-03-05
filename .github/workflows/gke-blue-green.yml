@@ -76,13 +76,22 @@ jobs:
           location: ${{ env.GKE_LOCATION }}
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Deploy to GKE (apply service + both deployments)
-        run: |
-          # Service decides which color receives traffic (selector app=webapp,color=blue/green)
-          kubectl apply -f k8s/service.yaml
+      - name: Deploy to GKE (blue/green)
+           run: |
+             if [[ "$K8S_OVERLAY" == "blue" ]]; then
+               kubectl apply -f k8s/deployment-blue.yaml
+             else
+               kubectl apply -f k8s/deployment-green.yaml
+             fi
 
-          # Keep both versions deployed (blue + green)
-          kubectl apply -f k8s/deployment-blue.yaml
-          kubectl apply -f k8s/deployment-green.yaml
+             # Inject the freshly built image into the running deployment
+             kubectl set image deployment/webapp-${K8S_OVERLAY} webapp=$IMAGE
 
-          kubectl get deploy,svc,pods -o wide
+             # Switch the LoadBalancer selector to the active color
+             kubectl patch service webapp \
+               -p "{\"spec\":{\"selector\":{\"app\":\"webapp\",\"color\":\"${K8S_OVERLAY}\"}}}"
+
+             kubectl apply -f k8s/service.yaml
+
+             kubectl rollout status deployment/webapp-${K8S_OVERLAY} --timeout=120s || true
+             kubectl get deploy,svc,pods -o wide
