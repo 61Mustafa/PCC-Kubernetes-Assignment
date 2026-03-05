@@ -60,6 +60,7 @@ jobs:
       - name: Build image
         run: |
           IMAGE="$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$GAR_REPO/$IMAGE_NAME:$IMAGE_TAG"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           echo "Building $IMAGE"
           docker build -t "$IMAGE" -f Dockerfile .
 
@@ -90,8 +91,6 @@ jobs:
              # Switch the LoadBalancer selector to the active color
              kubectl patch service webapp \
                -p "{\"spec\":{\"selector\":{\"app\":\"webapp\",\"color\":\"${K8S_OVERLAY}\"}}}"
-
-             kubectl apply -f k8s/service.yaml
 
              kubectl rollout status deployment/webapp-${K8S_OVERLAY} --timeout=120s || true
              kubectl get deploy,svc,pods -o wide
